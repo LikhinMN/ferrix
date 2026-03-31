@@ -1,5 +1,7 @@
+extern crate openblas_src;
 use rayon::prelude::*;
 use std::ops::{Add, Mul};
+use cblas::{dgemm, Layout, Transpose};
 pub struct NDArray<T> {
     pub data: Vec<T>,
     pub shape: Vec<usize>,
@@ -256,6 +258,49 @@ impl NDArray<f64> {
         let data = exp_data.into_iter().map(|x| x / sum_exp).collect();
         NDArray::new(data, self.shape.clone())
     }
+
+    pub fn matmul_blas(&self, other: &NDArray<f64>) -> NDArray<f64> {
+        if self.shape.len() != 2 || other.shape.len() != 2 {
+            panic!(
+                "matmul_blas requires 2D arrays, got {}D and {}D",
+                self.shape.len(),
+                other.shape.len()
+            );
+        }
+        if self.shape[1] != other.shape[0] {
+            panic!(
+                "shape mismatch for matmul_blas: self.shape[1] ({}) must equal other.shape[0] ({})",
+                self.shape[1], other.shape[0]
+            );
+        }
+
+        let m = self.shape[0];
+        let k = self.shape[1];
+        let n = other.shape[1];
+
+        let mut result_data = vec![0.0; m * n];
+
+        unsafe {
+            dgemm(
+                Layout::RowMajor,
+                Transpose::None,
+                Transpose::None,
+                m as i32,
+                n as i32,
+                k as i32,
+                1.0,
+                &self.data,
+                k as i32,
+                &other.data,
+                n as i32,
+                0.0,
+                &mut result_data,
+                n as i32,
+            );
+        }
+
+        NDArray::new(result_data, vec![m, n])
+    }
 }
 
 impl<'a,T> NDArrayView<'a,T>{
@@ -319,6 +364,53 @@ impl<'a,T> NDArrayView<'a,T>{
             offset: self.offset
         }
     }
+}
+
+use pyo3::prelude::*;
+
+#[pyclass]
+struct PyNDArray {
+    inner: NDArray<f64>,
+}
+
+#[pymethods]
+impl PyNDArray {
+    #[new]
+    fn new(data: Vec<f64>, shape: Vec<usize>) -> Self {
+        PyNDArray {
+            inner: NDArray::new(data, shape),
+        }
+    }
+
+    fn get(&self, index: Vec<usize>) -> f64 {
+        *self.inner.get(&index)
+    }
+
+    fn shape(&self) -> Vec<usize> {
+        self.inner.shape.clone()
+    }
+
+    fn sum(&self) -> f64 {
+        self.inner.sum()
+    }
+
+    fn mean(&self) -> f64 {
+        self.inner.mean()
+    }
+
+    fn relu(&self) -> PyNDArray {
+        PyNDArray { inner: self.inner.relu() }
+    }
+
+    fn matmul(&self, other: &PyNDArray) -> PyNDArray {
+        PyNDArray { inner: self.inner.matmul(&other.inner) }
+    }
+}
+
+#[pymodule]
+fn ferrix(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyNDArray>()?;
+    Ok(())
 }
 
 #[cfg(test)]

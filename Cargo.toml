@@ -9,6 +9,9 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 rayon = "1.10"
 num-traits = "0.2"
+cblas = "0.4"
+openblas-src = { version = "0.10", features = ["cblas", "system"] }
+pyo3 = { version = "0.21", features = ["extension-module"] }
 
 [dev-dependencies]
 criterion = "0.5"

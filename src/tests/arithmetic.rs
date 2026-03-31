@@ -124,3 +124,41 @@ fn test_f64_ops() {
     assert!((soft.get(&[2]) - 0.140244).abs() < 1e-5);
     assert!((soft.sum() - 1.0).abs() < 1e-10);
 }
+
+#[test]
+fn test_matmul_blas() {
+    let a = NDArray::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+    let b = NDArray::new(vec![5.0, 6.0, 7.0, 8.0], vec![2, 2]);
+    let c = a.matmul_blas(&b);
+
+    assert_eq!(*c.get(&[0, 0]), 19.0);
+    assert_eq!(*c.get(&[0, 1]), 22.0);
+    assert_eq!(*c.get(&[1, 0]), 43.0);
+    assert_eq!(*c.get(&[1, 1]), 50.0);
+
+    // Test different shapes
+    let a2 = NDArray::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]);
+    let b2 = NDArray::new(vec![7.0, 8.0, 9.0, 10.0, 11.0, 12.0], vec![3, 2]);
+    let c2 = a2.matmul_blas(&b2);
+    assert_eq!(c2.shape, vec![2, 2]);
+    assert_eq!(*c2.get(&[0, 0]), 58.0);
+    assert_eq!(*c2.get(&[0, 1]), 64.0);
+    assert_eq!(*c2.get(&[1, 0]), 139.0);
+    assert_eq!(*c2.get(&[1, 1]), 154.0);
+}
+
+#[test]
+#[should_panic(expected = "shape mismatch for matmul_blas: self.shape[1] (3) must equal other.shape[0] (2)")]
+fn test_matmul_blas_shape_mismatch() {
+    let a = NDArray::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]);
+    let b = NDArray::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+    let _ = a.matmul_blas(&b);
+}
+
+#[test]
+#[should_panic(expected = "matmul_blas requires 2D arrays, got 1D and 2D")]
+fn test_matmul_blas_not_2d() {
+    let a = NDArray::new(vec![1.0, 2.0], vec![2]);
+    let b = NDArray::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+    let _ = a.matmul_blas(&b);
+}
