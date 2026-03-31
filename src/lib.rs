@@ -1,3 +1,4 @@
+use std::ops::Add;
 pub struct NDArray<T> {
     pub data: Vec<T>,
     pub shape: Vec<usize>,
@@ -73,6 +74,80 @@ impl<T> NDArray<T> {
             offset: self.offset + row * self.strides[0],
         }
     }
+
+    pub fn slice_col(&self,col:usize)->NDArrayView<'_,T>{
+        if self.shape.len() != 2 {
+            panic!("slice_col requires a 2D array, got {}D", self.shape.len());
+        }
+        if col >= self.shape[1] {
+            panic!("index out of bounds for dimension 1: index {}, shape {}", col, self.shape[1]);
+        }
+        NDArrayView {
+            data: &self.data,
+            shape: vec![self.shape[0]],
+            strides: vec![self.strides[0]],
+            offset: self.offset + col * self.strides[1]
+        }
+    }
+
+    pub fn reshape(&self,new_shape:Vec<usize>)->NDArrayView<'_,T>{
+        let expected: usize = new_shape.iter().product();
+        if self.data.len() != expected {
+            panic!(
+                "data length {} does not match shape {:?} (expected {})",
+                self.data.len(),
+                new_shape,
+                expected
+            );
+        }
+
+        let mut strides = vec![0; new_shape.len()];
+        let mut current_stride = 1;
+
+        for i in (0..new_shape.len()).rev() {
+            strides[i] = current_stride;
+            current_stride *= new_shape[i];
+        }
+        NDArrayView {
+            data: &self.data,
+            shape: new_shape,
+            strides,
+            offset: 0,
+        }
+    }
+
+    pub fn transpose(&self) -> NDArrayView<'_, T>{
+        if self.shape.len() != 2 {
+            panic!("transpose requires a 2D array, got {}D", self.shape.len());
+        }
+        let new_shape=[self.shape[1],self.shape[0]].to_vec();
+        let new_stride=[self.strides[1],self.strides[0]].to_vec();
+        NDArrayView {
+            data: &self.data,
+            shape: new_shape,
+            strides: new_stride,
+            offset: 0
+        }
+    }
+
+    pub fn add(&self, other: &NDArray<T>) -> NDArray<T>
+    where
+        T: Add<Output = T> + Copy,
+    {
+        if self.shape != other.shape {
+            panic!(
+                "shape mismatch for addition: {:?} vs {:?}",
+                self.shape, other.shape
+            );
+        }
+        let data = self
+            .data
+            .iter()
+            .zip(other.data.iter())
+            .map(|(&a, &b)| a + b)
+            .collect();
+        NDArray::new(data, self.shape.clone())
+    }
 }
 
 impl<'a,T> NDArrayView<'a,T>{
@@ -105,6 +180,35 @@ impl<'a,T> NDArrayView<'a,T>{
             shape: vec![self.shape[1]],
             strides: vec![self.strides[1]],
             offset: self.offset + row * self.strides[0],
+        }
+    }
+
+    pub fn slice_col(&self,col:usize)->NDArrayView<'_,T>{
+        if self.shape.len() != 2 {
+            panic!("slice_col requires a 2D array, got {}D", self.shape.len());
+        }
+        if col >= self.shape[1] {
+            panic!("index out of bounds for dimension 1: index {}, shape {}", col, self.shape[1]);
+        }
+        NDArrayView {
+            data: self.data,
+            shape: vec![self.shape[0]],
+            strides: vec![self.strides[0]],
+            offset: self.offset + col * self.strides[1]
+        }
+    }
+
+    pub fn transpose(&self) -> NDArrayView<'_, T>{
+        if self.shape.len() != 2 {
+            panic!("transpose requires a 2D array, got {}D", self.shape.len());
+        }
+        let new_shape=[self.shape[1],self.shape[0]].to_vec();
+        let new_stride=[self.strides[1],self.strides[0]].to_vec();
+        NDArrayView {
+            data: self.data,
+            shape: new_shape,
+            strides: new_stride,
+            offset: self.offset
         }
     }
 }
