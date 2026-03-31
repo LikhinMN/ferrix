@@ -1,4 +1,5 @@
-use std::ops::Add;
+use rayon::prelude::*;
+use std::ops::{Add, Mul};
 pub struct NDArray<T> {
     pub data: Vec<T>,
     pub shape: Vec<usize>,
@@ -132,7 +133,7 @@ impl<T> NDArray<T> {
 
     pub fn add(&self, other: &NDArray<T>) -> NDArray<T>
     where
-        T: Add<Output = T> + Copy,
+        T: Add<Output = T> + Copy + Send + Sync,
     {
         if self.shape != other.shape {
             panic!(
@@ -142,10 +143,117 @@ impl<T> NDArray<T> {
         }
         let data = self
             .data
-            .iter()
-            .zip(other.data.iter())
+            .par_iter()
+            .zip(other.data.par_iter())
             .map(|(&a, &b)| a + b)
             .collect();
+        NDArray::new(data, self.shape.clone())
+    }
+    pub fn mul(&self, other: &NDArray<T>) -> NDArray<T>
+    where
+        T: Mul<Output = T> + Copy + Send + Sync,
+    {
+        if self.shape != other.shape {
+            panic!(
+                "shape mismatch for multiplication: {:?} vs {:?}",
+                self.shape, other.shape
+            );
+        }
+        let data = self
+            .data
+            .par_iter()
+            .zip(other.data.par_iter())
+            .map(|(&a, &b)| a * b)
+            .collect();
+        NDArray::new(data, self.shape.clone())
+    }
+
+    pub fn scale(&self, scalar: T) -> NDArray<T>
+    where
+        T: Mul<Output = T> + Copy + Send + Sync,
+    {
+        let data = self.data.par_iter().map(|&a| a * scalar).collect();
+        NDArray::new(data, self.shape.clone())
+    }
+
+    pub fn matmul(&self, other: &NDArray<T>) -> NDArray<T>
+    where
+        T: Add<Output = T> + Mul<Output = T> + Copy + Default,
+    {
+        if self.shape.len() != 2 || other.shape.len() != 2 {
+            panic!(
+                "matmul requires 2D arrays, got {}D and {}D",
+                self.shape.len(),
+                other.shape.len()
+            );
+        }
+        if self.shape[1] != other.shape[0] {
+            panic!(
+                "shape mismatch for matmul: self.shape[1] ({}) must equal other.shape[0] ({})",
+                self.shape[1], other.shape[0]
+            );
+        }
+
+        let m = self.shape[0];
+        let k_limit = self.shape[1];
+        let n = other.shape[1];
+        let mut result_data = vec![T::default(); m * n];
+
+        for i in 0..m {
+            for j in 0..n {
+                let mut sum = T::default();
+                for k in 0..k_limit {
+                    sum = sum + *self.get(&[i, k]) * *other.get(&[k, j]);
+                }
+                result_data[i * n + j] = sum;
+            }
+        }
+
+        NDArray::new(result_data, vec![m, n])
+    }
+}
+
+impl NDArray<f64> {
+    pub fn relu(&self) -> NDArray<f64> {
+        let data = self.data.par_iter().map(|&x| x.max(0.0)).collect();
+        NDArray::new(data, self.shape.clone())
+    }
+
+    pub fn sum(&self) -> f64 {
+        self.data.iter().sum()
+    }
+
+    pub fn mean(&self) -> f64 {
+        if self.data.is_empty() {
+            return 0.0;
+        }
+        self.sum() / self.data.len() as f64
+    }
+
+    pub fn argmax(&self) -> usize {
+        if self.data.is_empty() {
+            panic!("argmax on empty array");
+        }
+        let mut max_idx = 0;
+        let mut max_val = self.data[0];
+        for (i, &val) in self.data.iter().enumerate().skip(1) {
+            if val > max_val {
+                max_val = val;
+                max_idx = i;
+            }
+        }
+        max_idx
+    }
+
+    pub fn sigmoid(&self) -> NDArray<f64> {
+        let data = self.data.iter().map(|&x| 1.0 / (1.0 + (-x).exp())).collect();
+        NDArray::new(data, self.shape.clone())
+    }
+
+    pub fn softmax(&self) -> NDArray<f64> {
+        let exp_data: Vec<f64> = self.data.iter().map(|&x| x.exp()).collect();
+        let sum_exp: f64 = exp_data.iter().sum();
+        let data = exp_data.into_iter().map(|x| x / sum_exp).collect();
         NDArray::new(data, self.shape.clone())
     }
 }
