@@ -104,3 +104,49 @@ fn test_slice_col_not_2d_panic() {
     let a = NDArray::new(vec![1, 2, 3], vec![3]);
     a.slice_col(0);
 }
+
+#[test]
+fn test_slice_range() {
+    let a = NDArray::new(vec![1, 2, 3, 4, 5, 6, 7, 8, 9], vec![3, 3]);
+
+    let s = a.slice_range(0, 1, 3); // rows 1..3
+    assert_eq!(s.shape, vec![2, 3]);
+    assert_eq!(*s.get(&[0, 0]), 4);
+    assert_eq!(*s.get(&[1, 2]), 9);
+
+    let s2 = a.slice_range(1, 0, 2); // cols 0..2
+    assert_eq!(s2.shape, vec![3, 2]);
+    assert_eq!(*s2.get(&[0, 0]), 1);
+    assert_eq!(*s2.get(&[2, 1]), 8);
+}
+
+#[test]
+fn test_view_slice_range() {
+    let a = NDArray::new((1..=24).collect(), vec![2, 3, 4]);
+    let v = a.slice_range(1, 1, 3); // axis 1, range 1..3
+    assert_eq!(v.shape, vec![2, 2, 4]);
+
+    let v2 = v.slice_range(0, 1, 2); // axis 0, range 1..2
+    assert_eq!(v2.shape, vec![1, 2, 4]);
+}
+
+#[test]
+#[should_panic(expected = "axis 3 is out of bounds for NDArray with 2 dimensions")]
+fn test_slice_range_axis_oob() {
+    let a = NDArray::new(vec![1, 2, 3, 4], vec![2, 2]);
+    a.slice_range(3, 0, 1);
+}
+
+#[test]
+#[should_panic(expected = "invalid range: start 2 must be less than end 1")]
+fn test_slice_range_invalid_range() {
+    let a = NDArray::new(vec![1, 2, 3, 4], vec![2, 2]);
+    a.slice_range(0, 2, 1);
+}
+
+#[test]
+#[should_panic(expected = "range end 3 is out of bounds for axis 0 with shape 2")]
+fn test_slice_range_end_oob() {
+    let a = NDArray::new(vec![1, 2, 3, 4], vec![2, 2]);
+    a.slice_range(0, 0, 3);
+}

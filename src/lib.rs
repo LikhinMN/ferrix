@@ -93,6 +93,38 @@ impl<T> NDArray<T> {
         }
     }
 
+    pub fn slice_range(&self, axis: usize, start: usize, end: usize) -> NDArrayView<'_, T> {
+        if axis >= self.shape.len() {
+            panic!(
+                "axis {} is out of bounds for NDArray with {} dimensions",
+                axis,
+                self.shape.len()
+            );
+        }
+        if start >= end {
+            panic!(
+                "invalid range: start {} must be less than end {}",
+                start, end
+            );
+        }
+        if end > self.shape[axis] {
+            panic!(
+                "range end {} is out of bounds for axis {} with shape {}",
+                end, axis, self.shape[axis]
+            );
+        }
+
+        let mut new_shape = self.shape.clone();
+        new_shape[axis] = end - start;
+
+        NDArrayView {
+            data: &self.data,
+            shape: new_shape,
+            strides: self.strides.clone(),
+            offset: self.offset + start * self.strides[axis],
+        }
+    }
+
     pub fn reshape(&self,new_shape:Vec<usize>)->NDArrayView<'_,T>{
         let expected: usize = new_shape.iter().product();
         if self.data.len() != expected {
@@ -351,6 +383,38 @@ impl<'a,T> NDArrayView<'a,T>{
         }
     }
 
+    pub fn slice_range(&self, axis: usize, start: usize, end: usize) -> NDArrayView<'_, T> {
+        if axis >= self.shape.len() {
+            panic!(
+                "axis {} is out of bounds for NDArrayView with {} dimensions",
+                axis,
+                self.shape.len()
+            );
+        }
+        if start >= end {
+            panic!(
+                "invalid range: start {} must be less than end {}",
+                start, end
+            );
+        }
+        if end > self.shape[axis] {
+            panic!(
+                "range end {} is out of bounds for axis {} with shape {}",
+                end, axis, self.shape[axis]
+            );
+        }
+
+        let mut new_shape = self.shape.clone();
+        new_shape[axis] = end - start;
+
+        NDArrayView {
+            data: self.data,
+            shape: new_shape,
+            strides: self.strides.clone(),
+            offset: self.offset + start * self.strides[axis],
+        }
+    }
+
     pub fn transpose(&self) -> NDArrayView<'_, T>{
         if self.shape.len() != 2 {
             panic!("transpose requires a 2D array, got {}D", self.shape.len());
@@ -364,54 +428,34 @@ impl<'a,T> NDArrayView<'a,T>{
             offset: self.offset
         }
     }
-}
 
-use pyo3::prelude::*;
+    pub fn to_owned(&self) -> NDArray<T>
+    where
+        T: Clone,
+    {
+        let size: usize = self.shape.iter().product();
+        let mut owned_data = Vec::with_capacity(size);
+        let mut current_index = vec![0; self.shape.len()];
 
-#[pyclass]
-struct PyNDArray {
-    inner: NDArray<f64>,
-}
+        for _ in 0..size {
+            owned_data.push(self.get(&current_index).clone());
 
-#[pymethods]
-impl PyNDArray {
-    #[new]
-    fn new(data: Vec<f64>, shape: Vec<usize>) -> Self {
-        PyNDArray {
-            inner: NDArray::new(data, shape),
+            for i in (0..self.shape.len()).rev() {
+                current_index[i] += 1;
+                if current_index[i] < self.shape[i] {
+                    break;
+                } else {
+                    current_index[i] = 0;
+                }
+            }
         }
-    }
 
-    fn get(&self, index: Vec<usize>) -> f64 {
-        *self.inner.get(&index)
-    }
-
-    fn shape(&self) -> Vec<usize> {
-        self.inner.shape.clone()
-    }
-
-    fn sum(&self) -> f64 {
-        self.inner.sum()
-    }
-
-    fn mean(&self) -> f64 {
-        self.inner.mean()
-    }
-
-    fn relu(&self) -> PyNDArray {
-        PyNDArray { inner: self.inner.relu() }
-    }
-
-    fn matmul(&self, other: &PyNDArray) -> PyNDArray {
-        PyNDArray { inner: self.inner.matmul(&other.inner) }
+        NDArray::new(owned_data, self.shape.clone())
     }
 }
 
-#[pymodule]
-fn ferrix(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyNDArray>()?;
-    Ok(())
-}
 
 #[cfg(test)]
 mod tests;
+
+pub mod python;
