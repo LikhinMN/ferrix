@@ -333,6 +333,51 @@ impl NDArray<f64> {
 
         NDArray::new(result_data, vec![m, n])
     }
+
+    pub fn boolean_mask(&self, mask: &NDArray<bool>) -> NDArray<f64> {
+        if self.shape != mask.shape {
+            panic!(
+                "mask shape {:?} must equal self shape {:?}",
+                mask.shape, self.shape
+            );
+        }
+
+        let mut result_data = Vec::new();
+        // Use the same row-major iteration as to_owned() or similar logic
+        // But since both self and mask are NDArray (not views in this signature), 
+        // and NDArray stores data in row-major order flattened in .data, 
+        // we can simply iterate through both datas if they are not offset/strided.
+        // Wait, NDArray has strides and offset too! (lines 8-9)
+        
+        // However, NDArray constructor always creates a contiguous row-major buffer.
+        // If we want to support any NDArray (including potentially strided ones if we allow them),
+        // we should use a general iterator or index-based access.
+        
+        // Looking at current NDArray::new, it always builds contiguous.
+        // But the struct has offset/strides, so they might be used by methods returning NDArray.
+        // Currently slice_range/transpose etc return NDArrayView.
+        
+        let size: usize = self.shape.iter().product();
+        let mut current_index = vec![0; self.shape.len()];
+
+        for _ in 0..size {
+            if *mask.get(&current_index) {
+                result_data.push(*self.get(&current_index));
+            }
+
+            for i in (0..self.shape.len()).rev() {
+                current_index[i] += 1;
+                if current_index[i] < self.shape[i] {
+                    break;
+                } else {
+                    current_index[i] = 0;
+                }
+            }
+        }
+
+        let count = result_data.len();
+        NDArray::new(result_data, vec![count])
+    }
 }
 
 impl<'a,T> NDArrayView<'a,T>{
@@ -454,6 +499,16 @@ impl<'a,T> NDArrayView<'a,T>{
     }
 }
 
+
+use pyo3::prelude::*;
+use crate::python::PyNDArray;
+
+#[pymodule]
+fn ferrix(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyNDArray>()?;
+    m.add_class::<python::PyNDArrayBool>()?;
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests;

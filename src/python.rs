@@ -70,10 +70,28 @@ impl PyNDArray {
     fn matmul_blas(&self, other: &PyNDArray) -> PyNDArray {
         PyNDArray { inner: self.inner.matmul_blas(&other.inner) }
     }
+
+    fn boolean_mask(&self, mask: &PyNDArrayBool) -> PyNDArray {
+        PyNDArray { inner: self.inner.boolean_mask(&mask.inner) }
+    }
 }
 
-#[pymodule]
-fn ferrix(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyNDArray>()?;
-    Ok(())
+#[pyclass]
+pub struct PyNDArrayBool {
+    pub inner: NDArray<bool>,
 }
+
+#[pymethods]
+impl PyNDArrayBool {
+    #[new]
+    fn new(data: Vec<bool>, shape: Vec<usize>) -> Self {
+        PyNDArrayBool {
+            inner: NDArray::new(data, shape),
+        }
+    }
+
+    fn shape(&self) -> Vec<usize> {
+        self.inner.shape.clone()
+    }
+}
+

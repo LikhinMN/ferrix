@@ -6,3 +6,4 @@ mod slicing;
 mod reshaping;
 mod transposing;
 mod arithmetic;
+mod masking;
