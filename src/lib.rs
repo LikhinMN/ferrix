@@ -45,6 +45,24 @@ impl<T> NDArray<T> {
     }
 }
 impl<T> NDArray<T> {
+    pub fn fancy_index(&self, indices: &[usize]) -> NDArray<T>
+    where
+        T: Clone,
+    {
+        if self.shape.len() != 1 {
+            panic!(
+                "fancy_index is only valid for 1D arrays, got {}D",
+                self.shape.len()
+            );
+        }
+
+        let mut result_data = Vec::with_capacity(indices.len());
+        for &idx in indices {
+            result_data.push(self.get(&[idx]).clone());
+        }
+
+        NDArray::new(result_data, vec![indices.len()])
+    }
 
     pub fn get(&self, index: &[usize]) -> &T {
         if index.len() != self.shape.len() {
@@ -61,6 +79,23 @@ impl<T> NDArray<T> {
             flatten += index[i] * self.strides[i];
         }
         &self.data[flatten]
+    }
+
+    pub fn get_mut(&mut self, index: &[usize]) -> &mut T {
+        if index.len() != self.shape.len() {
+            panic!("length of the given index and shape must match.")
+        }
+        let mut flatten = self.offset;
+        for i in 0..index.len() {
+            if index[i] >= self.shape[i] {
+                panic!(
+                    "index out of bounds for dimension {}: index {}, shape {}",
+                    i, index[i], self.shape[i]
+                );
+            }
+            flatten += index[i] * self.strides[i];
+        }
+        &mut self.data[flatten]
     }
 
     pub fn slice_row(&self, row: usize) -> NDArrayView<'_, T> {
@@ -377,6 +412,65 @@ impl NDArray<f64> {
 
         let count = result_data.len();
         NDArray::new(result_data, vec![count])
+    }
+
+    pub fn masked_fill(&mut self, mask: &NDArray<bool>, value: f64) {
+        if self.shape != mask.shape {
+            panic!(
+                "mask shape {:?} must equal self shape {:?}",
+                mask.shape, self.shape
+            );
+        }
+
+        let size: usize = self.shape.iter().product();
+        let mut current_index = vec![0; self.shape.len()];
+
+        for _ in 0..size {
+            if *mask.get(&current_index) {
+                *self.get_mut(&current_index) = value;
+            }
+
+            for i in (0..self.shape.len()).rev() {
+                current_index[i] += 1;
+                if current_index[i] < self.shape[i] {
+                    break;
+                } else {
+                    current_index[i] = 0;
+                }
+            }
+        }
+    }
+
+    pub fn where_(&self, condition: &NDArray<bool>, other: &NDArray<f64>) -> NDArray<f64> {
+        if self.shape != condition.shape || self.shape != other.shape {
+            panic!(
+                "shape mismatch: self.shape {:?}, condition.shape {:?}, other.shape {:?}",
+                self.shape, condition.shape, other.shape
+            );
+        }
+
+        let size: usize = self.shape.iter().product();
+        let mut result_data = Vec::with_capacity(size);
+        let mut current_index = vec![0; self.shape.len()];
+
+        for _ in 0..size {
+            if *condition.get(&current_index) {
+                result_data.push(*self.get(&current_index));
+            } else {
+                result_data.push(*other.get(&current_index));
+            }
+
+            for i in (0..self.shape.len()).rev() {
+                current_index[i] += 1;
+                if current_index[i] < self.shape[i] {
+                    break;
+                } else {
+                    current_index[i] = 0;
+                }
+            }
+        }
+
+        NDArray::new(result_data, self.shape.clone())
     }
 }
 
