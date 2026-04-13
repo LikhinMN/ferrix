@@ -162,3 +162,14 @@ fn test_matmul_blas_not_2d() {
     let b = NDArray::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
     let _ = a.matmul_blas(&b);
 }
+#[test]
+fn test_cumsum() {
+    use crate::NDArray;
+    let a = NDArray::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+    let r = a.cumsum();
+    assert_eq!(r.shape, vec![4]);
+    assert_eq!(*r.get(&[0]), 1.0);
+    assert_eq!(*r.get(&[1]), 3.0);
+    assert_eq!(*r.get(&[2]), 6.0);
+    assert_eq!(*r.get(&[3]), 10.0);
+}

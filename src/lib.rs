@@ -349,7 +349,11 @@ impl NDArray<f64> {
             );
         }
 
-        let size = end - start;
+        let size: usize = (end - start) * self.shape.iter()
+            .enumerate()
+            .filter(|&(i, _)| i != axis)
+            .map(|(_, &s)| s)
+            .product::<usize>();
         let mut current_index = vec![0; self.shape.len()];
 
         for i in 0..self.shape.len() {
