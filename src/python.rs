@@ -74,6 +74,46 @@ impl PyNDArray {
     fn boolean_mask(&self, mask: &PyNDArrayBool) -> PyNDArray {
         PyNDArray { inner: self.inner.boolean_mask(&mask.inner) }
     }
+
+    fn masked_fill(&mut self, mask: &PyNDArrayBool, value: f64) {
+        self.inner.masked_fill(&mask.inner, value);
+    }
+
+    fn where_(&self, condition: &PyNDArrayBool, other: &PyNDArray) -> PyNDArray {
+        PyNDArray { inner: self.inner.where_(&condition.inner, &other.inner) }
+    }
+
+    fn fancy_index(&self, indices: Vec<usize>) -> PyNDArray {
+        PyNDArray { inner: self.inner.fancy_index(&indices) }
+    }
+
+    fn slice_row(&self, row: usize) -> PyNDArray {
+        PyNDArray { inner: self.inner.slice_row(row).to_owned() }
+    }
+
+    fn slice_col(&self, col: usize) -> PyNDArray {
+        PyNDArray { inner: self.inner.slice_col(col).to_owned() }
+    }
+
+    fn slice_range(&self, axis: usize, start: usize, end: usize) -> PyNDArray {
+        PyNDArray { inner: self.inner.slice_range(axis, start, end).to_owned() }
+    }
+
+    fn reshape(&self, new_shape: Vec<usize>) -> PyNDArray {
+        PyNDArray { inner: self.inner.reshape(new_shape).to_owned() }
+    }
+
+    fn gather(&self, axis: usize, indices: Vec<usize>) -> PyNDArray {
+        PyNDArray { inner: self.inner.gather(axis, &indices) }
+    }
+
+    fn set_slice(&mut self, axis: usize, start: usize, end: usize, value: f64) {
+        self.inner.set_slice(axis, start, end, value);
+    }
+
+    fn cumsum(&self) -> PyNDArray {
+        PyNDArray { inner: self.inner.cumsum() }
+    }
 }
 
 #[pyclass]
@@ -94,4 +134,3 @@ impl PyNDArrayBool {
         self.inner.shape.clone()
     }
 }
-
