@@ -68,7 +68,8 @@ impl PyNDArray {
     }
 
     fn matmul_blas(&self, other: &PyNDArray) -> PyNDArray {
-        PyNDArray { inner: self.inner.matmul_blas(&other.inner) }
+        // BLAS backend was removed; keep API and fall back to pure Rust matmul.
+        PyNDArray { inner: self.inner.matmul(&other.inner) }
     }
 
     fn boolean_mask(&self, mask: &PyNDArrayBool) -> PyNDArray {
@@ -116,7 +117,7 @@ impl PyNDArray {
     }
 }
 
-#[pyclass]
+#[pyclass(name = "PyBoolArray")]
 pub struct PyNDArrayBool {
     pub inner: NDArray<bool>,
 }

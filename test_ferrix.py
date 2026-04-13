@@ -112,6 +112,12 @@ def test_softmax():
     for i in range(3):
         assert abs(res.get([0, i]) - np_res[i]) < 1e-6
 
+def test_argmax():
+    data = [1.0, 3.0, 2.0, 4.0, 0.0]
+    shape = [5]
+    arr = ferrix.PyNDArray(data, shape)
+    assert arr.argmax() == 3
+
 if __name__ == "__main__":
     test_creation_and_get()
     test_add()
@@ -122,4 +128,5 @@ if __name__ == "__main__":
     test_sum_mean()
     test_transpose()
     test_softmax()
+    test_argmax()
     print("All tests passed!")
