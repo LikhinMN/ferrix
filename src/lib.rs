@@ -128,6 +128,51 @@ impl<T> NDArray<T> {
         }
     }
 
+    pub fn gather(&self, axis: usize, indices: &[usize]) -> NDArray<T>
+    where
+        T: Clone,
+    {
+        if axis >= self.shape.len() {
+            panic!(
+                "axis {} is out of bounds for NDArray with {} dimensions",
+                axis,
+                self.shape.len()
+            );
+        }
+        for &idx in indices {
+            if idx >= self.shape[axis] {
+                panic!(
+                    "index {} out of bounds for axis {} with shape {}",
+                    idx, axis, self.shape[axis]
+                );
+            }
+        }
+
+        let mut out_shape = self.shape.clone();
+        out_shape[axis] = indices.len();
+        let out_size: usize = out_shape.iter().product();
+
+        let mut result_data = Vec::with_capacity(out_size);
+        let mut current_index = vec![0; out_shape.len()];
+
+        for _ in 0..out_size {
+            let mut in_index = current_index.clone();
+            in_index[axis] = indices[current_index[axis]];
+            result_data.push(self.get(&in_index).clone());
+
+            for i in (0..out_shape.len()).rev() {
+                current_index[i] += 1;
+                if current_index[i] < out_shape[i] {
+                    break;
+                } else {
+                    current_index[i] = 0;
+                }
+            }
+        }
+
+        NDArray::new(result_data, out_shape)
+    }
+
     pub fn slice_range(&self, axis: usize, start: usize, end: usize) -> NDArrayView<'_, T> {
         if axis >= self.shape.len() {
             panic!(
@@ -283,6 +328,71 @@ impl<T> NDArray<T> {
 }
 
 impl NDArray<f64> {
+    pub fn set_slice(&mut self, axis: usize, start: usize, end: usize, value: f64) {
+        if axis >= self.shape.len() {
+            panic!(
+                "axis {} is out of bounds for NDArray with {} dimensions",
+                axis,
+                self.shape.len()
+            );
+        }
+        if start >= end {
+            panic!(
+                "invalid range: start {} must be less than end {}",
+                start, end
+            );
+        }
+        if end > self.shape[axis] {
+            panic!(
+                "range end {} is out of bounds for axis {} with shape {}",
+                end, axis, self.shape[axis]
+            );
+        }
+
+        let size = end - start;
+        let mut current_index = vec![0; self.shape.len()];
+
+        for i in 0..self.shape.len() {
+            current_index[i] = if i == axis { start } else { 0 };
+        }
+
+        for _ in 0..size {
+            *self.get_mut(&current_index) = value;
+
+            for i in (0..self.shape.len()).rev() {
+                current_index[i] += 1;
+                if current_index[i] < self.shape[i] {
+                    break;
+                } else {
+                    current_index[i] = 0;
+                }
+            }
+        }
+    }
+
+    pub fn cumsum(&self) -> NDArray<f64> {
+        let size: usize = self.shape.iter().product();
+        let mut result_data = Vec::with_capacity(size);
+        let mut current_index = vec![0; self.shape.len()];
+        let mut sum = 0.0;
+
+        for _ in 0..size {
+            sum += *self.get(&current_index);
+            result_data.push(sum);
+
+            for i in (0..self.shape.len()).rev() {
+                current_index[i] += 1;
+                if current_index[i] < self.shape[i] {
+                    break;
+                } else {
+                    current_index[i] = 0;
+                }
+            }
+        }
+
+        NDArray::new(result_data, vec![size])
+    }
+
     pub fn relu(&self) -> NDArray<f64> {
         let data = self.data.par_iter().map(|&x| x.max(0.0)).collect();
         NDArray::new(data, self.shape.clone())
