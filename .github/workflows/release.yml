@@ -46,9 +46,6 @@ jobs:
     name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write
 
     steps:
       - name: Download wheels
@@ -61,5 +58,7 @@ jobs:
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
         with:
-          command: upload
+          command: publish
           args: --non-interactive --skip-existing dist/*
+        env:
+          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
