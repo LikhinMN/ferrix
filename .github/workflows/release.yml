@@ -14,10 +14,13 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64
+            manylinux: manylinux2014
           - os: macos-latest
             target: universal2-apple-darwin
+            manylinux: off
           - os: windows-latest
             target: x64
+            manylinux: off
 
     steps:
       - uses: actions/checkout@v4
@@ -31,9 +34,9 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
           args: --release --out dist --find-interpreter
           sccache: 'true'
-          manylinux: auto
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
