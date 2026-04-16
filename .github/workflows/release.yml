@@ -7,20 +7,18 @@ on:
 
 jobs:
   build:
-    name: Build wheels - ${{ matrix.os }}
+    name: Build wheels — ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
             target: x86_64
-            manylinux: manylinux2014
           - os: macos-latest
             target: universal2-apple-darwin
-            manylinux: off
           - os: windows-latest
             target: x64
-            manylinux: off
 
     steps:
       - uses: actions/checkout@v4
@@ -34,9 +32,9 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          manylinux: ${{ matrix.manylinux }}
-          args: --release --out dist --find-interpreter
+          args: --release --out dist
           sccache: 'true'
+          manylinux: auto
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -61,6 +59,7 @@ jobs:
           path: dist
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: PyO3/maturin-action@v1
         with:
-          skip-existing: true
+          command: upload
+          args: --non-interactive --skip-existing dist/*
